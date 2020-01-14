@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+  <meta charset="UTF-8"> 
+<style>
+	html{
+		width:100%;
+		height:100%;
+		font-family: Arial, Helvetica, sans-serif;
+		font-size: 12px;
+	}
+	
+	body{
+		width:100%;
+		height:100%;
+	}
+	
+	div.zoom {
+		width: 370px;
+		position: static;
+		/*border: 1px solid blue;*/
+		transform-origin: 0% 0%;
+		transform: scale(2);
+		}	
+	
+    .fa.fafire{
+		letter-spacing: -1px;
+		font-size:16px;
+		color:red;
+	}
+	
+	.fa {
+		letter-spacing: -1px;
+		font-size:12px;
+	}
+	
+	.fa-fire{
+		color:red;
+	}
+	
+	.fa-minus{
+		color:green;
+	}
+	
+	.tabulator{
+	    width:340px;
+	}
+
+	p.save2{
+	    visibility:hidden;
+	}
+	.refresh{
+	    font-size:8px;
+		color:blue;
+	}
+	
+	.ete{
+	    font-size:8px;
+	}
+</style>
+
+<head>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.4.0/css/font-awesome.min.css">
+	<link href="https://cdnjs.cloudflare.com/ajax/libs/tabulator/3.5.3/css/tabulator.min.css" rel="stylesheet">
+	<link href="https://cdnjs.cloudflare.com/ajax/libs/tabulator/3.0.0/css/tabulator.min.css" rel="stylesheet">
+	<script src="https://code.jquery.com/jquery-2.2.4.js"integrity="sha256-iT6Q9iMJYuQiMWNd9lDyBUStIq/8PuOW33aOqmvFpqI="crossorigin="anonymous"></script>
+	<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
+ 	<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/tabulator/4.4.3/js/tabulator.min.js"> </script>
+
+</head>
+
+<body>
+	<div class = "zoom">
+		<H2> Configuration </H2>
+		<div id="tb"></div>
+		<p class="save" id = "save">
+		<button id="save" type="button" onclick="SaveData()" >Sauvegarder</button><button id="cancel" type="button" onclick="Cancel()" >Annuler</button>
+		Pass: <input type="password" id="pass" name="lname" value=""><br>
+		<br>
+		</p>
+	</div>
+
+</body>
+
+<script>
+	tabledata = "{\"ftp_url\":\"ftp.pugh.be\",\"ftp_user\":\"IOT@iot.pugh.be\",\"ftp_pass\":\"JCS\"}";
+	var table;
+	var Edited = false;
+	var dataDisp = [];
+	var dataSvr = {};
+	var data = {};
+	
+	LoadData();
+    showData();
+
+	function LoadData(){
+		var x = window.location.href;
+		var y = x.substr(0, x.lastIndexOf('/'));
+
+		//y = 'http://192.168.0.240';
+		url = y+'/getconfigdata';
+	
+		fetch(url)
+		.then (function(resp){
+			if (!resp.ok) {
+				Alert ("Respone NOT ok");
+				throw Error(resp.statusText);
+			}
+			return resp.json().then(function(json){
+				
+				dataSvr = json;
+				//dataSvr = JSON.parse(tabledata);
+				// translate for display
+				
+				for (var key in dataSvr) {
+					if (dataSvr.hasOwnProperty(key)) {
+						var obj = {"A":key,"B":dataSvr[key]};
+						dataDisp.push(obj);
+						
+					}
+				}
+				table.setData(dataDisp);
+				//alert(JSON.stringify(dataDisp));
+				//$("#tb").tabulator("setData", dataDisp);
+				//$("#tb").tabulator("redraw",true);
+			});	
+		})
+		.catch(function(error) {
+		});
+	}
+	
+	function SaveData(){
+		Edited = false;
+		document.getElementById("save").style.visibility='hidden';
+		var dataEdited = table.getData();
+		//modified values from list to data 
+		for (x in dataEdited) {
+			key = dataEdited[x].A;
+			value = dataEdited[x].B;
+			dataSvr[key] = value;
+		}				
+		payload = JSON.stringify(dataSvr);
+		//alert(payload);
+		var x = window.location.href;
+		var y = x.substr(0, x.lastIndexOf('/'));
+		url = y+'/saveconfigdata?data=';
+		url += payload;
+		fetch(url)
+		.then (function(resp){
+			if (!resp.ok) {
+				alert ("Respone NOT ok");
+				throw Error(resp.statusText);
+			}
+			return resp.text()
+			.then(function(text) {
+				if (text){
+					//alert(text);
+					Edited = false;
+				}
+			});	
+		})
+		.catch(function(error) {
+			alert(error);		
+		});			
+	}	
+
+	function showData()	{
+		var editCheck = function(cell){
+			pass = document.getElementById("pass").value;
+			var A = cell.getData().A;
+			A = A.toUpperCase();
+			return (pass == 'Admin') | ((pass == 'User') && (A.indexOf("PASS") == -1));
+		}
+		table = new Tabulator("#tb", {
+		data:dataDisp,
+		columns:[
+				{title: "Param", field: "A", width: 100, headerSort:false},
+				{title: "Value", field: "B", width: 400, editor:"input", editable:editCheck, headerSort:false , formatter:function(cell, formatterParams){
+										var value = cell.getValue();
+										var A = cell.getData().A;
+										A = A.toUpperCase();
+										pass = document.getElementById("pass").value;
+										if ((A.indexOf("PASS") == -1) | (pass == 'Admin')) {
+											return value;
+										} 
+										return '***********';
+							}},
+				],
+					cellEdited:function(cell){
+						document.getElementById("save").style.visibility='visible';
+						Edited=true;
+					}
+		});
+	}
+
+	function Cancel() {
+		LoadData();
+	} 
+
+	function handleRefresh(element){ 
+	  if (refresh == true) {
+		refresh = false;
+		clearInterval(T);
+		element.innerHTML = "Rafraîchir"; 
+	  } 
+	  else
+	  { 
+		T = setInterval(LoadData,1000);
+		refresh = true;
+		element.innerHTML = "Ne plus rafraîchir"; 
+	 }	
+	}
+
+
+</script></html>
